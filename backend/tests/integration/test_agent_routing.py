@@ -149,10 +149,10 @@ async def test_router_routes_to_statute_agent(mock_ollama_response):
         content = '{"agents": ["STATUTE"], "reasoning": "statutory query", "confidence": 0.9, "query_type": "statutory"}'
         return mock_ollama_response(content)
 
-    with patch("app.agents.graph.get_ollama_client") as mock_client:
+    with patch("app.agents.router.get_ollama_client") as mock_client:
         mock_client.return_value.chat = mock_chat
         mock_client.return_value.chat.return_value = mock_chat(None, None)
-        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+        with patch("app.retrieval.hybrid_retriever.HybridRetriever.retrieve", return_value=[]):
             initial_state: LegalResearchState = {
                 "query": "What does section 35 of the Employment Act say?",
                 "user_id": "test-user-id",
@@ -183,10 +183,10 @@ async def test_router_routes_to_multiple_agents(mock_ollama_response):
         content = '{"agents": ["STATUTE", "CONSTITUTIONAL"], "reasoning": "multi-domain", "confidence": 0.85, "query_type": "mixed"}'
         return mock_ollama_response(content)
 
-    with patch("app.agents.graph.get_ollama_client") as mock_client:
+    with patch("app.agents.router.get_ollama_client") as mock_client:
         mock_client.return_value.chat = mock_chat
         mock_client.return_value.chat.return_value = mock_chat(None, None)
-        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+        with patch("app.retrieval.hybrid_retriever.HybridRetriever.retrieve", return_value=[]):
             initial_state: LegalResearchState = {
                 "query": "Does employment law comply with constitutional rights?",
                 "user_id": "test-user-id",
@@ -219,10 +219,10 @@ async def test_router_routes_to_case_law(mock_ollama_response):
         content = '{"agents": ["CASE_LAW"], "reasoning": "case law query", "confidence": 0.9, "query_type": "precedent"}'
         return mock_ollama_response(content)
 
-    with patch("app.agents.graph.get_ollama_client") as mock_client:
+    with patch("app.agents.router.get_ollama_client") as mock_client:
         mock_client.return_value.chat = mock_chat
         mock_client.return_value.chat.return_value = mock_chat(None, None)
-        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+        with patch("app.retrieval.hybrid_retriever.HybridRetriever.retrieve", return_value=[]):
             initial_state: LegalResearchState = {
                 "query": "What precedents exist for wrongful dismissal?",
                 "user_id": "test-user-id",
@@ -251,10 +251,10 @@ async def test_router_routes_to_comparison(mock_ollama_response):
         content = '{"agents": ["COMPARISON"], "reasoning": "comparative query", "confidence": 0.9, "query_type": "comparison"}'
         return mock_ollama_response(content)
 
-    with patch("app.agents.graph.get_ollama_client") as mock_client:
+    with patch("app.agents.router.get_ollama_client") as mock_client:
         mock_client.return_value.chat = mock_chat
         mock_client.return_value.chat.return_value = mock_chat(None, None)
-        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+        with patch("app.retrieval.hybrid_retriever.HybridRetriever.retrieve", return_value=[]):
             initial_state: LegalResearchState = {
                 "query": "Compare the Employment Act and Industrial Relations Act on strike rights",
                 "user_id": "test-user-id",
