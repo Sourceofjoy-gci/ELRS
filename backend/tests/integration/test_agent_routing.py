@@ -128,3 +128,148 @@ def test_comparison_query_routing():
     is_comparison = "compare" in query.lower() and "and" in query.lower()
 
     assert is_comparison
+
+
+import pytest
+from unittest.mock import MagicMock, patch
+from app.agents.graph import create_legal_research_graph, LegalResearchState
+
+@pytest.fixture
+def mock_ollama_response():
+    def make_response(content: str):
+        return {"message": {"content": content}}
+    return make_response
+
+@pytest.mark.asyncio
+async def test_router_routes_to_statute_agent(mock_ollama_response):
+    """Router returns STATUTE → statute_node should be reachable."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        content = '{"agents": ["STATUTE"], "reasoning": "statutory query", "confidence": 0.9, "query_type": "statutory"}'
+        return mock_ollama_response(content)
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        mock_client.return_value.chat.return_value = mock_chat(None, None)
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            initial_state: LegalResearchState = {
+                "query": "What does section 35 of the Employment Act say?",
+                "user_id": "test-user-id",
+                "filters": {},
+                "routing_decision": {},
+                "statute_result": None,
+                "constitutional_result": None,
+                "case_law_result": None,
+                "comparison_result": None,
+                "retrieved_chunks": [],
+                "agent_trace": [],
+                "final_answer": "",
+                "sources": [],
+                "confidence": "MEDIUM",
+                "disclaimer": "",
+            }
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": MagicMock()}})
+            assert result["routing_decision"]["agents"] == ["STATUTE"]
+            assert result["statute_result"] is not None
+            assert result["constitutional_result"] is None  # not routed
+
+@pytest.mark.asyncio
+async def test_router_routes_to_multiple_agents(mock_ollama_response):
+    """Router returns STATUTE+CONSTITUTIONAL → both should be reachable."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        content = '{"agents": ["STATUTE", "CONSTITUTIONAL"], "reasoning": "multi-domain", "confidence": 0.85, "query_type": "mixed"}'
+        return mock_ollama_response(content)
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        mock_client.return_value.chat.return_value = mock_chat(None, None)
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            initial_state: LegalResearchState = {
+                "query": "Does employment law comply with constitutional rights?",
+                "user_id": "test-user-id",
+                "filters": {},
+                "routing_decision": {},
+                "statute_result": None,
+                "constitutional_result": None,
+                "case_law_result": None,
+                "comparison_result": None,
+                "retrieved_chunks": [],
+                "agent_trace": [],
+                "final_answer": "",
+                "sources": [],
+                "confidence": "MEDIUM",
+                "disclaimer": "",
+            }
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": MagicMock()}})
+            assert result["routing_decision"]["agents"] == ["STATUTE", "CONSTITUTIONAL"]
+            assert result["statute_result"] is not None, "statute should have run"
+            assert result["constitutional_result"] is not None, "constitutional should have run"
+            assert result["case_law_result"] is None  # not routed
+            assert result["comparison_result"] is None  # not routed
+
+@pytest.mark.asyncio
+async def test_router_routes_to_case_law(mock_ollama_response):
+    """Router returns CASE_LAW → case_law_node should be reachable."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        content = '{"agents": ["CASE_LAW"], "reasoning": "case law query", "confidence": 0.9, "query_type": "precedent"}'
+        return mock_ollama_response(content)
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        mock_client.return_value.chat.return_value = mock_chat(None, None)
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            initial_state: LegalResearchState = {
+                "query": "What precedents exist for wrongful dismissal?",
+                "user_id": "test-user-id",
+                "filters": {},
+                "routing_decision": {},
+                "statute_result": None,
+                "constitutional_result": None,
+                "case_law_result": None,
+                "comparison_result": None,
+                "retrieved_chunks": [],
+                "agent_trace": [],
+                "final_answer": "",
+                "sources": [],
+                "confidence": "MEDIUM",
+                "disclaimer": "",
+            }
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": MagicMock()}})
+            assert result["case_law_result"] is not None, "case_law should have run"
+
+@pytest.mark.asyncio
+async def test_router_routes_to_comparison(mock_ollama_response):
+    """Router returns COMPARISON → comparison_node should be reachable."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        content = '{"agents": ["COMPARISON"], "reasoning": "comparative query", "confidence": 0.9, "query_type": "comparison"}'
+        return mock_ollama_response(content)
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        mock_client.return_value.chat.return_value = mock_chat(None, None)
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            initial_state: LegalResearchState = {
+                "query": "Compare the Employment Act and Industrial Relations Act on strike rights",
+                "user_id": "test-user-id",
+                "filters": {},
+                "routing_decision": {},
+                "statute_result": None,
+                "constitutional_result": None,
+                "case_law_result": None,
+                "comparison_result": None,
+                "retrieved_chunks": [],
+                "agent_trace": [],
+                "final_answer": "",
+                "sources": [],
+                "confidence": "MEDIUM",
+                "disclaimer": "",
+            }
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": MagicMock()}})
+            assert result["comparison_result"] is not None, "comparison should have run"
