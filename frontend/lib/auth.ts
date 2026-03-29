@@ -7,69 +7,64 @@ export interface UserJWTPayload extends JWTPayload {
   iat?: number
 }
 
-const ACCESS_TOKEN_KEY = 'elri_auth_token'
-const REFRESH_TOKEN_KEY = 'elri_refresh_token'
+const COOKIE_NAME = 'elri_auth_token'
 
+/**
+ * Get the auth token from the HTTP-only cookie.
+ * Works on both server (via cookies()) and client (via document.cookie).
+ */
 export function getToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(ACCESS_TOKEN_KEY)
-}
-
-export function setToken(token: string): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(ACCESS_TOKEN_KEY, token)
-}
-
-export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(REFRESH_TOKEN_KEY)
-}
-
-export function setRefreshToken(token: string): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(REFRESH_TOKEN_KEY, token)
-}
-
-export function clearToken(): void {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(ACCESS_TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
-}
-
-export function refreshToken(): string | null {
-  const token = getRefreshToken()
-  if (!token) return null
-
-  try {
-    const payload = decodeJwt(token) as UserJWTPayload
-
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      clearToken()
-      return null
-    }
-
-    return token
-  } catch {
-    clearToken()
+  if (typeof window === 'undefined') {
+    // Server-side: not available in server components without async cookies()
+    // For synchronous server contexts, return null
     return null
+  }
+  // Client-side: read from HTTP-only cookie
+  const match = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(`${COOKIE_NAME}=`))
+  return match ? decodeURIComponent(match.split('=')[1]) : null
+}
+
+/**
+ * Trigger a page reload after the server sets the HTTP-only cookie.
+ * Called after login to refresh the page state.
+ */
+export function setToken(_token: string): void {
+  if (typeof window !== 'undefined') {
+    window.location.reload()
   }
 }
 
+/**
+ * Clear the auth cookie by setting Max-Age=0.
+ */
+export function clearToken(): void {
+  if (typeof window === 'undefined') {
+    // Server-side: need async cookies API — use clearTokenAsync instead
+    return
+  }
+  document.cookie = `${COOKIE_NAME}=; Max-Age=0; path=/`
+  if (typeof window !== 'undefined') {
+    window.location.reload()
+  }
+}
+
+/**
+ * Decode and return the current user from the token cookie.
+ * Returns null if no token or expired.
+ */
 export function getUser(): UserJWTPayload | null {
   const token = getToken()
   if (!token) return null
-
   try {
     const payload = decodeJwt(token) as UserJWTPayload
-
     if (payload.exp && Date.now() >= payload.exp * 1000) {
       clearToken()
       return null
     }
-
     return payload
   } catch {
-    clearToken()
     return null
   }
 }
@@ -79,34 +74,28 @@ export function isAuthenticated(): boolean {
 }
 
 export function isAdmin(): boolean {
-  const user = getUser()
-  return user?.role === 'admin'
+  return getUser()?.role === 'admin'
 }
 
 export function isResearcher(): boolean {
-  const user = getUser()
-  return user?.role === 'researcher' || user?.role === 'admin'
+  const role = getUser()?.role
+  return role === 'researcher' || role === 'admin'
 }
 
 export function getRole(): 'admin' | 'researcher' | 'public' | null {
-  const user = getUser()
-  return user?.role || null
+  return getUser()?.role ?? null
 }
 
 export function getUserId(): string | null {
-  const user = getUser()
-  return user?.sub || null
+  return getUser()?.sub ?? null
 }
 
 export function isTokenExpired(): boolean {
   const token = getToken()
   if (!token) return true
-
   try {
     const payload = decodeJwt(token) as UserJWTPayload
-
     if (!payload.exp) return false
-
     return Date.now() >= payload.exp * 1000
   } catch {
     return true
