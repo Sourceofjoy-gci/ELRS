@@ -1,0 +1,10 @@
+version: "3.8"
+
+x-cpu-base: &cpu_base
+  OLLAMA_NUM_THREADS: 8
+
+services:
+  ollama:
+    environment:
+      - OLLAMA_NUM_THREADS=8
+    runtime: null
