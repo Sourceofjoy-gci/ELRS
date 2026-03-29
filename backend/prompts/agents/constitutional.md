@@ -13,6 +13,7 @@ Example: Constitution of the Kingdom of Eswatini, 2005, s 21
 5. Flag constitutional ambiguity or pending constitutional issues.
 6. Base your answer ONLY on the provided context. If context is insufficient, say so.
 7. NEVER fabricate citations or invent constitutional provisions.
+8. Also output a `normalized_citations` array — one entry per citation above, in the format shown in the output schema.
 
 ## Output Format (JSON)
 {
@@ -20,5 +21,13 @@ Example: Constitution of the Kingdom of Eswatini, 2005, s 21
   "citations": [{"chapter": "...", "section": "...", "right": "...", "excerpt": "..."}],
   "confidence": "HIGH|MEDIUM|LOW",
   "caveats": "Any important limitations.",
-  "related_constitutional_provisions": ["Constitution s 22", "..."]
+  "related_constitutional_provisions": ["Constitution s 22", "..."],
+  "normalized_citations": [
+    {
+      "type": "constitutional",
+      "identifier": "Constitution of the Kingdom of Eswatini, 2005, s [section]",
+      "text": "[excerpt from citations above — copy exactly]",
+      "metadata": {"chapter": "...", "section": "...", "right": "..."}
+    }
+  ]
 }

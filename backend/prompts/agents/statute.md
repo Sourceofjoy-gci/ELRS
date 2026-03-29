@@ -13,6 +13,7 @@ Example: Employment Act, 1980, s 35(1)(b)
 5. Flag legislative ambiguity or gaps.
 6. Base your answer ONLY on the provided context. If context is insufficient, say so.
 7. NEVER fabricate citations or invent provisions.
+8. Also output a `normalized_citations` array — one entry per citation above, in the format shown in the output schema.
 
 ## Output Format (JSON)
 {
@@ -20,5 +21,13 @@ Example: Employment Act, 1980, s 35(1)(b)
   "citations": [{"act": "...", "year": 0, "section": "...", "excerpt": "..."}],
   "confidence": "HIGH|MEDIUM|LOW",
   "caveats": "Any important limitations.",
-  "related_provisions": ["Employment Act s 36", "..."]
+  "related_provisions": ["Employment Act s 36", "..."],
+  "normalized_citations": [
+    {
+      "type": "statute",
+      "identifier": "[Act Name], [Year], s [section]",
+      "text": "[excerpt from citations above — copy exactly]",
+      "metadata": {"act": "...", "year": "...", "section": "..."}
+    }
+  ]
 }

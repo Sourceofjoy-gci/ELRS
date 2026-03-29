@@ -13,6 +13,7 @@ Example: Smith v Jones, 2010 HC ( Civ) 123
 5. Identify how cases have been applied or distinguished in subsequent decisions.
 6. Base your answer ONLY on the provided context. If context is insufficient, say so.
 7. NEVER fabricate case citations or invent judicial decisions.
+8. Also output a `normalized_citations` array — one entry per citation above, in the format shown in the output schema.
 
 ## Output Format (JSON)
 {
@@ -28,5 +29,13 @@ Example: Smith v Jones, 2010 HC ( Civ) 123
     }
   ],
   "confidence": "HIGH|MEDIUM|LOW",
-  "caveats": "Any important limitations."
+  "caveats": "Any important limitations.",
+  "normalized_citations": [
+    {
+      "type": "case_law",
+      "identifier": "[Party Names] v [Party Names], [Year] [Court]",
+      "text": "[summary or excerpt from citations above — copy exactly]",
+      "metadata": {"case_name": "...", "court": "...", "year": "...", "precedential_value": "..."}
+    }
+  ]
 }

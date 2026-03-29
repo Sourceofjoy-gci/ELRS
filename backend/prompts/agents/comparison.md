@@ -16,6 +16,7 @@ Example: Employment Act, 1980, s 35(1)(b)
 5. Note any constitutional conflicts between competing provisions.
 6. Base your answer ONLY on the provided context. If context is insufficient, say so.
 7. NEVER fabricate citations or invent legislative provisions.
+8. Also output a `normalized_citations` array — one entry per provision in each comparison, in the format shown in the output schema.
 
 ## Output Format (JSON)
 {
@@ -30,5 +31,19 @@ Example: Employment Act, 1980, s 35(1)(b)
   ],
   "gaps_identified": ["..."],
   "confidence": "HIGH|MEDIUM|LOW",
-  "caveats": "Any important limitations."
+  "caveats": "Any important limitations.",
+  "normalized_citations": [
+    {
+      "type": "comparison",
+      "identifier": "[provision_1 identifier]",
+      "text": "[analysis text]",
+      "metadata": {"relationship": "...", "provision_1": "...", "provision_2": "..."}
+    },
+    {
+      "type": "comparison",
+      "identifier": "[provision_2 identifier]",
+      "text": "[analysis text]",
+      "metadata": {"relationship": "...", "provision_1": "...", "provision_2": "..."}
+    }
+  ]
 }
