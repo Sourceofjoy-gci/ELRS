@@ -2,9 +2,9 @@ import json
 import logging
 import time
 import uuid
-from typing import TypedDict, Annotated, List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
-import operator
+from app.agents.state import LegalResearchState
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.llm.ollama_client import get_ollama_client
 from app.retrieval.hybrid_retriever import HybridRetriever
@@ -13,23 +13,6 @@ from app.retrieval.models import RetrievedChunk
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-
-
-class LegalResearchState(TypedDict):
-    query: str
-    user_id: str
-    filters: Dict[str, Any]
-    routing_decision: Dict[str, Any]
-    statute_result: Optional[Dict[str, Any]]
-    constitutional_result: Optional[Dict[str, Any]]
-    case_law_result: Optional[Dict[str, Any]]
-    comparison_result: Optional[Dict[str, Any]]
-    retrieved_chunks: Annotated[List[Dict[str, Any]], operator.add]
-    agent_trace: Annotated[List[Dict[str, Any]], operator.add]
-    final_answer: str
-    sources: List[Dict[str, Any]]
-    confidence: str
-    disclaimer: str
 
 
 def load_prompt(prompt_name: str) -> str:
