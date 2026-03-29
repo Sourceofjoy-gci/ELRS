@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -113,7 +114,7 @@ async def get_me(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(User).where(User.id == current_user["user_id"])
+    query = select(User).where(User.id == uuid.UUID(current_user["user_id"]))
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
