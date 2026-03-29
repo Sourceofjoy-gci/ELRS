@@ -2,6 +2,7 @@ import json
 import time
 import logging
 from app.agents.state import LegalResearchState
+from app.agents.citation_normalizer import normalize_citations
 from app.agents.router import load_prompt
 from app.llm.ollama_client import get_ollama_client
 from app.core.config import get_settings
@@ -26,9 +27,18 @@ async def synthesis_node(state: LegalResearchState, db) -> LegalResearchState:
         all_results.append(f"COMPARISON ANALYSIS:\n{json.dumps(state['comparison_result'], indent=2)}")
 
     synthesis_prompt = load_prompt("synthesis")
+
+    # Normalize citations from all specialists to LegalCitation[]
+    normalized_citations = normalize_citations(state)
+    normalized_json = json.dumps(normalized_citations, indent=2)
+
     messages = [
         {"role": "system", "content": synthesis_prompt},
-        {"role": "user", "content": f"Original Query: {state['query']}\n\nSpecialist Agent Results:\n\n" + "\n\n".join(all_results)},
+        {"role": "user", "content": (
+            f"Original Query: {state['query']}\n\n"
+            f"Specialist Agent Results:\n\n" + "\n\n".join(all_results) + "\n\n"
+            f"Normalized Citations (use these for your references section):\n{normalized_json}"
+        )},
     ]
 
     try:
