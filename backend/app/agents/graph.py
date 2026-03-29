@@ -335,34 +335,118 @@ async def synthesis_node(state: LegalResearchState, db: AsyncSession) -> LegalRe
     return state
 
 
-def should_run_agent(agent_name: str):
-    def check(state: LegalResearchState) -> bool:
-        return agent_name in state["routing_decision"].get("agents", [])
-    return check
+def build_routing_map(state: LegalResearchState) -> str:
+    """Determine next node after router or any specialist based on routing_decision.
+
+    Agents run one at a time (not in parallel). After each specialist completes,
+    control returns here to decide the next step — either another specialist
+    or synthesis.
+    """
+    agents = state["routing_decision"].get("agents", [])
+    visited = {e["agent"] for e in state["agent_trace"] if e["agent"] != "router"}
+
+    for agent in agents:
+        agent_key = agent.lower()  # "STATUTE" -> "statute"
+        if agent_key not in visited:
+            return agent_key
+
+    return "synthesis"
 
 
 def create_legal_research_graph():
     workflow = StateGraph(LegalResearchState)
 
-    workflow.add_node("router", lambda state, db=None: router_node(state, db))
-    workflow.add_node("statute", lambda state, db=None: statute_node(state, db))
-    workflow.add_node("constitutional", lambda state, db=None: constitutional_node(state, db))
-    workflow.add_node("case_law", lambda state, db=None: case_law_node(state, db))
-    workflow.add_node("comparison", lambda state, db=None: comparison_node(state, db))
-    workflow.add_node("synthesis", lambda state, db=None: synthesis_node(state, db))
+    # Wrapper functions to inject db from config into async nodes
+    async def router_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await router_node(state, db)
+
+    async def statute_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await statute_node(state, db)
+
+    async def constitutional_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await constitutional_node(state, db)
+
+    async def case_law_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await case_law_node(state, db)
+
+    async def comparison_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await comparison_node(state, db)
+
+    async def synthesis_wrapper(state, config):
+        db = config.get("configurable", {}).get("db")
+        return await synthesis_node(state, db)
+
+    workflow.add_node("router", router_wrapper)
+    workflow.add_node("statute", statute_wrapper)
+    workflow.add_node("constitutional", constitutional_wrapper)
+    workflow.add_node("case_law", case_law_wrapper)
+    workflow.add_node("comparison", comparison_wrapper)
+    workflow.add_node("synthesis", synthesis_wrapper)
 
     workflow.set_entry_point("router")
 
+    # Router routes to first unvisited specialist or synthesis
     workflow.add_conditional_edges(
         "router",
-        should_run_agent("STATUTE"),
-        {"statute": "statute", "__end__": "synthesis"}
+        build_routing_map,
+        {
+            "statute": "statute",
+            "constitutional": "constitutional",
+            "case_law": "case_law",
+            "comparison": "comparison",
+            "synthesis": "synthesis",
+        }
     )
 
-    workflow.add_edge("statute", "synthesis")
-    workflow.add_edge("constitutional", "synthesis")
-    workflow.add_edge("case_law", "synthesis")
-    workflow.add_edge("comparison", "synthesis")
+    # Each specialist routes back to build_routing_map to decide next step
+    workflow.add_conditional_edges(
+        "statute",
+        build_routing_map,
+        {
+            "constitutional": "constitutional",
+            "case_law": "case_law",
+            "comparison": "comparison",
+            "synthesis": "synthesis",
+        }
+    )
+
+    workflow.add_conditional_edges(
+        "constitutional",
+        build_routing_map,
+        {
+            "statute": "statute",
+            "case_law": "case_law",
+            "comparison": "comparison",
+            "synthesis": "synthesis",
+        }
+    )
+
+    workflow.add_conditional_edges(
+        "case_law",
+        build_routing_map,
+        {
+            "statute": "statute",
+            "constitutional": "constitutional",
+            "comparison": "comparison",
+            "synthesis": "synthesis",
+        }
+    )
+
+    workflow.add_conditional_edges(
+        "comparison",
+        build_routing_map,
+        {
+            "statute": "statute",
+            "constitutional": "constitutional",
+            "case_law": "case_law",
+            "synthesis": "synthesis",
+        }
+    )
 
     workflow.add_edge("synthesis", END)
 
