@@ -161,7 +161,6 @@ async def chat_sync(
         content=result.get("final_answer", ""),
         agent_trace=result.get("agent_trace", []),
         sources={"sources": result.get("sources", [])},
-        confidence=result.get("confidence", "MEDIUM"),
     )
     db.add(message)
     await db.commit()

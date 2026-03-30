@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
     ollama_primary_model: str = os.getenv("OLLAMA_PRIMARY_MODEL", "mistral:7b-instruct-q4_K_M")
-    ollama_fallback_model: str = os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.1:8b-instruct-q4_K_M")
-    ollama_router_model: str = os.getenv("OLLAMA_ROUTER_MODEL", "phi3:mini-instruct-q4")
+    ollama_fallback_model: str = os.getenv("OLLAMA_FALLBACK_MODEL", "mistral:7b-instruct-q4_K_M")
+    ollama_router_model: str = os.getenv("OLLAMA_ROUTER_MODEL", "phi3:mini")
     ollama_temperature: float = float(os.getenv("OLLAMA_TEMPERATURE", "0.1"))
     ollama_num_ctx: int = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
     ollama_request_timeout: float = float(os.getenv("OLLAMA_REQUEST_TIMEOUT", "300.0"))

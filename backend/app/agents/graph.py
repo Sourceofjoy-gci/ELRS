@@ -11,6 +11,10 @@ from app.agents.nodes.comparison import comparison_node
 from app.agents.nodes.synthesis import synthesis_node
 
 
+# Valid specialist agent names (must match node names in the graph)
+VALID_AGENTS = {"statute", "constitutional", "case_law", "comparison"}
+
+
 def build_routing_map(state: LegalResearchState) -> str:
     """Determine next node after router or any specialist based on routing_decision."""
     agents = state["routing_decision"].get("agents", [])
@@ -18,7 +22,7 @@ def build_routing_map(state: LegalResearchState) -> str:
 
     for agent in agents:
         agent_key = agent.lower()
-        if agent_key not in visited:
+        if agent_key in VALID_AGENTS and agent_key not in visited:
             return agent_key
 
     return "synthesis"

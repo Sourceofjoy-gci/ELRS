@@ -57,7 +57,7 @@ class BM25Store:
                 dc.section_number,
                 dc.section_heading,
                 dc.part_heading,
-                dc.metadata,
+                dc.chunk_metadata as metadata,
                 ts_rank(to_tsvector('english', dc.content), to_tsquery('english', :ts_query)) AS bm25_score
             FROM document_chunks dc
             JOIN legal_documents ld ON ld.id = dc.document_id
@@ -105,7 +105,7 @@ class BM25Store:
                 dc.section_number,
                 dc.section_heading,
                 dc.part_heading,
-                dc.metadata,
+                dc.chunk_metadata as metadata,
                 ts_rank(to_tsvector('english', dc.section_heading), to_tsquery('english', :ts_query)) AS bm25_score
             FROM document_chunks dc
             JOIN legal_documents ld ON ld.id = dc.document_id

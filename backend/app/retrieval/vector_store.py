@@ -1,10 +1,16 @@
+import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import ProgrammingError
 from app.core.config import get_settings
 from app.retrieval.models import RetrievedChunk
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Track whether pgvector has been confirmed unavailable
+_pgvector_available: Optional[bool] = False
 
 
 class VectorStore:
@@ -18,6 +24,12 @@ class VectorStore:
         filters: Optional[Dict[str, Any]] = None,
         min_score: float = None,
     ) -> List[RetrievedChunk]:
+        global _pgvector_available
+
+        # Skip if pgvector was already confirmed unavailable
+        if _pgvector_available is False:
+            return []
+
         if min_score is None:
             min_score = settings.retrieval_min_vector_score
 
@@ -58,7 +70,7 @@ class VectorStore:
                 dc.section_number,
                 dc.section_heading,
                 dc.part_heading,
-                dc.metadata,
+                dc.chunk_metadata as metadata,
                 1 - (dc.embedding <=> :embedding) AS vector_score
             FROM document_chunks dc
             JOIN legal_documents ld ON ld.id = dc.document_id
@@ -69,8 +81,17 @@ class VectorStore:
             LIMIT :top_k
         """)
 
-        result = await self.db.execute(query, params)
-        rows = result.fetchall()
+        try:
+            result = await self.db.execute(query, params)
+            rows = result.fetchall()
+        except ProgrammingError:
+            # pgvector extension not available - mark as unavailable and return empty
+            _pgvector_available = False
+            logger.warning("pgvector not available, skipping vector search")
+            return []
+
+        # Success - pgvector is available
+        _pgvector_available = True
 
         chunks = []
         for row in rows:

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,20 +70,24 @@ class HybridRetriever:
 
         query_embedding = await self.embedder.embed_query(query)
 
-        vector_task = self.vector_store.similarity_search(
+        vector_results = await self.vector_store.similarity_search(
             query_embedding=query_embedding,
             top_k=reranker_candidates,
             filters=filters,
         )
-        bm25_task = self.bm25_store.keyword_search(
+        bm25_results = await self.bm25_store.keyword_search(
             query=query,
             top_k=reranker_candidates,
             filters=filters,
         )
 
-        vector_results, bm25_results = await asyncio.gather(vector_task, bm25_task)
-
-        await trace_retrieval(query, len(vector_results), max(v.vector_score for v in vector_results) if vector_results else 0, "hybrid")
+        trace_retrieval(
+            None,  # trace span not available in retrieval layer
+            query,
+            len(vector_results),
+            max(v.vector_score for v in vector_results) if vector_results else 0,
+            "hybrid"
+        )
 
         fused_results = self._reciprocal_rank_fusion(
             [vector_results, bm25_results],

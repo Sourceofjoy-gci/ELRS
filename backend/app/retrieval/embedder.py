@@ -12,6 +12,8 @@ class TEIUnavailableError(Exception):
 
 
 class LocalEmbedder:
+    """TEI-based embedder (deprecated - use OllamaEmbedder instead)."""
+
     def __init__(
         self,
         base_url: str = None,
@@ -105,17 +107,126 @@ class LocalEmbedder:
     async def health_check(self) -> bool:
         try:
             client = await self._get_client()
-            response = await client.get("/health")
+            response = client.get("/health")
+            await response.aclose()
             return response.status_code == 200
         except Exception:
             return False
 
 
-_embedder: Optional[LocalEmbedder] = None
+class OllamaEmbedder:
+    """Ollama-based embedder using the /api/embeddings endpoint."""
+
+    def __init__(
+        self,
+        base_url: str = None,
+        model: str = None,
+        dimensions: int = None,
+        batch_size: int = None,
+    ):
+        self.base_url = base_url or settings.ollama_base_url
+        self.model = model or "nomic-embed-text"
+        self.dimensions = dimensions or settings.tei_embedding_dimensions
+        self.batch_size = batch_size or settings.tei_batch_size
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=httpx.Timeout(120.0),
+                limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            )
+        return self._client
+
+    async def close(self):
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+
+    async def embed_query(self, text: str) -> List[float]:
+        client = await self._get_client()
+        prefixed_text = f"search_query: {text}"
+
+        try:
+            response = await client.post(
+                "/api/embeddings",
+                json={"model": self.model, "prompt": prefixed_text}
+            )
+
+            if response.status_code != 200:
+                raise TEIUnavailableError(f"Ollama embedder returned status {response.status_code}")
+
+            data = response.json()
+            embedding = data.get("embedding", [])
+
+            if not embedding:
+                raise TEIUnavailableError("Ollama returned empty embedding")
+
+            return embedding
+
+        except httpx.ConnectError as e:
+            logger.error(f"Failed to connect to Ollama embeddings at {self.base_url}: {e}")
+            raise TEIUnavailableError(f"Ollama embeddings is unreachable at {self.base_url}")
+
+    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+
+        client = await self._get_client()
+        prefixed_texts = [f"search_document: {text}" for text in texts]
+        all_embeddings = []
+
+        for i in range(0, len(prefixed_texts), self.batch_size):
+            batch = prefixed_texts[i:i + self.batch_size]
+            batch_embeddings = []
+
+            for text in batch:
+                try:
+                    response = await client.post(
+                        "/api/embeddings",
+                        json={"model": self.model, "prompt": text}
+                    )
+
+                    if response.status_code != 200:
+                        raise TEIUnavailableError(
+                            f"Ollama embedder returned status {response.status_code}"
+                        )
+
+                    data = response.json()
+                    embedding = data.get("embedding", [])
+
+                    if not embedding:
+                        raise TEIUnavailableError("Ollama returned empty embedding")
+
+                    batch_embeddings.append(embedding)
+
+                except httpx.ConnectError as e:
+                    logger.error(
+                        f"Failed to connect to Ollama embeddings at {self.base_url}: {e}"
+                    )
+                    raise TEIUnavailableError(
+                        f"Ollama embeddings is unreachable at {self.base_url}"
+                    )
+
+            all_embeddings.extend(batch_embeddings)
+
+        return all_embeddings
+
+    async def health_check(self) -> bool:
+        try:
+            client = await self._get_client()
+            response = await client.get("/")
+            return response.status_code == 200
+        except Exception:
+            return False
 
 
-def get_embedder() -> LocalEmbedder:
+_embedder: Optional[OllamaEmbedder] = None
+
+
+def get_embedder() -> OllamaEmbedder:
     global _embedder
     if _embedder is None:
-        _embedder = LocalEmbedder()
+        _embedder = OllamaEmbedder()
     return _embedder
