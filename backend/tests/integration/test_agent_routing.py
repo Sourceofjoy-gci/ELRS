@@ -162,6 +162,7 @@ async def test_routes_to_statute_only(mock_ollama_response, mock_db):
         "constitutional_result": None,
         "case_law_result": None,
         "comparison_result": None,
+        "subsidiary_result": None,
         "retrieved_chunks": [],
         "agent_trace": [],
         "final_answer": "",
