@@ -25,6 +25,7 @@ class LegalResearchState(TypedDict):
     constitutional_result: Optional[Dict[str, Any]]
     case_law_result: Optional[Dict[str, Any]]
     comparison_result: Optional[Dict[str, Any]]
+    subsidiary_result: Optional[Dict[str, Any]]
     retrieved_chunks: Annotated[List[Dict[str, Any]], operator.add]
     agent_trace: Annotated[List[Dict[str, Any]], operator.add]
     final_answer: str
@@ -261,6 +262,31 @@ async def comparison_node(state: LegalResearchState, config=None) -> dict:
     }
 
 
+async def subsidiary_node(state: LegalResearchState, config=None) -> dict:
+    """SI/regulations specialist."""
+    db = _get_db_from_config(config)
+    chunks = await _retrieve_chunks(state["query"], state.get("filters", {}), db)
+    prompt = load_prompt("subsidiary")
+    agent_output = await _call_agent(
+        "subsidiary",
+        prompt,
+        state["query"],
+        chunks,
+        settings.ollama_primary_model,
+        db,
+    )
+    return {
+        "subsidiary_result": agent_output["result"],
+        "subsidiary_trace": {
+            "action": "subsidiary_analysis",
+            "chunks_found": len(chunks),
+            "top_score": agent_output["result"].get("top_score", 0),
+            "latency_ms": agent_output["latency_ms"],
+            "model_used": agent_output["model_used"],
+        },
+    }
+
+
 async def synthesis_node(state: LegalResearchState, config=None) -> LegalResearchState:
     db = _get_db_from_config(config)
     start_time = time.time()
@@ -272,6 +298,7 @@ async def synthesis_node(state: LegalResearchState, config=None) -> LegalResearc
         ("constitutional", "constitutional_trace"),
         ("case_law", "case_law_trace"),
         ("comparison", "comparison_trace"),
+        ("subsidiary", "subsidiary_trace"),
     ]:
         if state.get(trace_field):
             state["agent_trace"].append({**({"agent": agent_name}), **state[trace_field]})
@@ -285,6 +312,8 @@ async def synthesis_node(state: LegalResearchState, config=None) -> LegalResearc
         all_results.append(f"CASE LAW ANALYSIS:\n{json.dumps(state['case_law_result'], indent=2)}")
     if state.get("comparison_result"):
         all_results.append(f"COMPARISON ANALYSIS:\n{json.dumps(state['comparison_result'], indent=2)}")
+    if state.get("subsidiary_result"):
+        all_results.append(f"SUBSIDIARY LEGISLATION ANALYSIS:\n{json.dumps(state['subsidiary_result'], indent=2)}")
 
     synthesis_prompt = load_prompt("synthesis")
     messages = [
@@ -354,6 +383,8 @@ def route_from_router(state: LegalResearchState) -> list[Send]:
         sends.append(Send("case_law", specialist_state))
     if "COMPARISON" in agents:
         sends.append(Send("comparison", specialist_state))
+    if "SUBSIDIARY" in agents:
+        sends.append(Send("subsidiary", specialist_state))
 
     return sends
 
@@ -366,6 +397,7 @@ def create_legal_research_graph():
     workflow.add_node("constitutional", constitutional_node)
     workflow.add_node("case_law", case_law_node)
     workflow.add_node("comparison", comparison_node)
+    workflow.add_node("subsidiary", subsidiary_node)
     workflow.add_node("synthesis", synthesis_node)
 
     workflow.set_entry_point("router")
@@ -373,13 +405,14 @@ def create_legal_research_graph():
     workflow.add_conditional_edges(
         "router",
         route_from_router,
-        ["statute", "constitutional", "case_law", "comparison"],
+        ["statute", "constitutional", "case_law", "comparison", "subsidiary"],
     )
 
     workflow.add_edge("statute", "synthesis")
     workflow.add_edge("constitutional", "synthesis")
     workflow.add_edge("case_law", "synthesis")
     workflow.add_edge("comparison", "synthesis")
+    workflow.add_edge("subsidiary", "synthesis")
 
     workflow.add_edge("synthesis", END)
 
