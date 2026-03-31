@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStreamingChat } from '@/lib/hooks/useStreamingChat'
 import { MessageBubble } from './MessageBubble'
 import { SourceCitation } from './SourceCitation'
-import { CitationPanel } from '@/components/ui/citation-panel'
+import { CitationPanel, Citation } from '@/components/ui/citation-panel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -20,6 +20,7 @@ interface Message {
     id: string
     act_name: string
     section_number?: string
+    year?: number
     chunk_excerpt: string
     reranker_score: number
   }>
@@ -236,13 +237,7 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
         </p>
       </div>
       <CitationPanel
-        citations={(sources || []) as Array<{
-          id: string
-          act_name: string
-          section_number?: string
-          chunk_excerpt: string
-          reranker_score: number
-        }>}
+        citations={(sources || []) as Citation[]}
         activeCitationId={activeCitationId}
         onClose={() => setCitationPanelOpen(false)}
         onHighlightToggle={setHighlightEnabled}
