@@ -1,6 +1,21 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
+from app.agents.graph import create_legal_research_graph, LegalResearchState
+
+
+@pytest.fixture
+def mock_ollama_response():
+    """Return a mock Ollama chat response wrapping JSON content."""
+    def make_response(content: str):
+        return {"message": {"content": content}}
+    return make_response
+
+
+@pytest.fixture
+def mock_db():
+    """Dummy async DB session mock."""
+    return AsyncMock()
 
 
 def test_routing_decision_structure():
@@ -128,3 +143,188 @@ def test_comparison_query_routing():
     is_comparison = "compare" in query.lower() and "and" in query.lower()
 
     assert is_comparison
+
+
+@pytest.mark.asyncio
+async def test_routes_to_statute_only(mock_ollama_response, mock_db):
+    """Router returns STATUTE → statute_node runs, others skip."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["STATUTE"], "reasoning": "statutory query", "confidence": 0.9, "query_type": "statutory"}')
+
+    initial_state: LegalResearchState = {
+        "query": "What does section 35 of the Employment Act say?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["STATUTE"]
+    assert result["statute_result"] is not None
+    assert result["constitutional_result"] is None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_constitutional_only(mock_ollama_response, mock_db):
+    """Router returns CONSTITUTIONAL → constitutional_node runs, others skip."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["CONSTITUTIONAL"], "reasoning": "constitutional query", "confidence": 0.9, "query_type": "constitutional"}')
+
+    initial_state: LegalResearchState = {
+        "query": "What are the constitutional rights to fair trial?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["CONSTITUTIONAL"]
+    assert result["statute_result"] is None
+    assert result["constitutional_result"] is not None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_case_law_only(mock_ollama_response, mock_db):
+    """Router returns CASE_LAW → case_law_node runs, others skip."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["CASE_LAW"], "reasoning": "case law query", "confidence": 0.9, "query_type": "case_law"}')
+
+    initial_state: LegalResearchState = {
+        "query": "What precedents exist for wrongful dismissal?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["CASE_LAW"]
+    assert result["statute_result"] is None
+    assert result["constitutional_result"] is None
+    assert result["case_law_result"] is not None
+    assert result["comparison_result"] is None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_comparison_only(mock_ollama_response, mock_db):
+    """Router returns COMPARISON → comparison_node runs, others skip."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["COMPARISON"], "reasoning": "comparison query", "confidence": 0.9, "query_type": "comparison"}')
+
+    initial_state: LegalResearchState = {
+        "query": "Compare termination provisions in Employment Act and Labour Act",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["COMPARISON"]
+    assert result["statute_result"] is None
+    assert result["constitutional_result"] is None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is not None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_multiple_agents(mock_ollama_response, mock_db):
+    """Router returns [STATUTE, CONSTITUTIONAL] → both specialist nodes run."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["STATUTE", "CONSTITUTIONAL"], "reasoning": "multi-domain query", "confidence": 0.85, "query_type": "mixed"}')
+
+    initial_state: LegalResearchState = {
+        "query": "Does employment law comply with constitutional rights?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["STATUTE", "CONSTITUTIONAL"]
+    assert result["statute_result"] is not None
+    assert result["constitutional_result"] is not None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is None

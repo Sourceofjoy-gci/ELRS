@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 from typing import TypedDict, Annotated, List, Dict, Any, Optional
+from langgraph.types import Send
 from langgraph.graph import StateGraph, END
 import operator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +33,11 @@ class LegalResearchState(TypedDict):
     disclaimer: str
 
 
+def _get_db_from_config(config) -> AsyncSession:
+    """Extract db session from LangGraph config."""
+    return config.get("configurable", {}).get("db") if config else None
+
+
 def load_prompt(prompt_name: str) -> str:
     try:
         with open(f"prompts/agents/{prompt_name}.md", "r") as f:
@@ -45,7 +51,8 @@ def load_prompt(prompt_name: str) -> str:
             return ""
 
 
-async def router_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
+async def router_node(state: LegalResearchState, config=None) -> LegalResearchState:
+    db = _get_db_from_config(config)
     start_time = time.time()
     ollama = get_ollama_client()
 
@@ -150,15 +157,10 @@ async def _call_agent(
     }
 
 
-async def statute_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
-    if "STATUTE" not in state["routing_decision"].get("agents", []):
-        return state
-
+async def statute_node(state: LegalResearchState, config=None) -> dict:
+    """Statute specialist — returns only statute_result to avoid concurrent write conflicts."""
+    db = _get_db_from_config(config)
     chunks = await _retrieve_chunks(state["query"], state.get("filters", {}), db)
-
-    for chunk in chunks:
-        state["retrieved_chunks"].append(chunk.to_dict())
-
     prompt = load_prompt("statute")
     agent_output = await _call_agent(
         "statute",
@@ -168,31 +170,24 @@ async def statute_node(state: LegalResearchState, db: AsyncSession) -> LegalRese
         settings.ollama_primary_model,
         db,
     )
-
-    state["statute_result"] = agent_output["result"]
-    state["agent_trace"].append({
-        "agent": "statute",
-        "action": "statute_analysis",
-        "chunks_found": len(chunks),
-        "top_score": agent_output["result"].get("top_score", 0),
-        "latency_ms": agent_output["latency_ms"],
-        "model_used": agent_output["model_used"],
-    })
-
-    return state
+    return {
+        "statute_result": agent_output["result"],
+        "statute_trace": {
+            "action": "statute_analysis",
+            "chunks_found": len(chunks),
+            "top_score": agent_output["result"].get("top_score", 0),
+            "latency_ms": agent_output["latency_ms"],
+            "model_used": agent_output["model_used"],
+        },
+    }
 
 
-async def constitutional_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
-    if "CONSTITUTIONAL" not in state["routing_decision"].get("agents", []):
-        return state
-
+async def constitutional_node(state: LegalResearchState, config=None) -> dict:
+    """Constitutional specialist — returns only constitutional_result to avoid concurrent write conflicts."""
+    db = _get_db_from_config(config)
     filters = state.get("filters", {})
     filters["doc_type"] = "constitution"
     chunks = await _retrieve_chunks(state["query"], filters, db)
-
-    for chunk in chunks:
-        state["retrieved_chunks"].append(chunk.to_dict())
-
     prompt = load_prompt("constitutional")
     agent_output = await _call_agent(
         "constitutional",
@@ -202,31 +197,24 @@ async def constitutional_node(state: LegalResearchState, db: AsyncSession) -> Le
         settings.ollama_primary_model,
         db,
     )
-
-    state["constitutional_result"] = agent_output["result"]
-    state["agent_trace"].append({
-        "agent": "constitutional",
-        "action": "constitutional_analysis",
-        "chunks_found": len(chunks),
-        "top_score": agent_output["result"].get("top_score", 0),
-        "latency_ms": agent_output["latency_ms"],
-        "model_used": agent_output["model_used"],
-    })
-
-    return state
+    return {
+        "constitutional_result": agent_output["result"],
+        "constitutional_trace": {
+            "action": "constitutional_analysis",
+            "chunks_found": len(chunks),
+            "top_score": agent_output["result"].get("top_score", 0),
+            "latency_ms": agent_output["latency_ms"],
+            "model_used": agent_output["model_used"],
+        },
+    }
 
 
-async def case_law_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
-    if "CASE_LAW" not in state["routing_decision"].get("agents", []):
-        return state
-
+async def case_law_node(state: LegalResearchState, config=None) -> dict:
+    """Case law specialist — returns only case_law_result to avoid concurrent write conflicts."""
+    db = _get_db_from_config(config)
     filters = state.get("filters", {})
     filters["doc_type"] = "case_law"
     chunks = await _retrieve_chunks(state["query"], filters, db)
-
-    for chunk in chunks:
-        state["retrieved_chunks"].append(chunk.to_dict())
-
     prompt = load_prompt("case_law")
     agent_output = await _call_agent(
         "case_law",
@@ -236,29 +224,22 @@ async def case_law_node(state: LegalResearchState, db: AsyncSession) -> LegalRes
         settings.ollama_primary_model,
         db,
     )
-
-    state["case_law_result"] = agent_output["result"]
-    state["agent_trace"].append({
-        "agent": "case_law",
-        "action": "case_law_analysis",
-        "chunks_found": len(chunks),
-        "top_score": agent_output["result"].get("top_score", 0),
-        "latency_ms": agent_output["latency_ms"],
-        "model_used": agent_output["model_used"],
-    })
-
-    return state
+    return {
+        "case_law_result": agent_output["result"],
+        "case_law_trace": {
+            "action": "case_law_analysis",
+            "chunks_found": len(chunks),
+            "top_score": agent_output["result"].get("top_score", 0),
+            "latency_ms": agent_output["latency_ms"],
+            "model_used": agent_output["model_used"],
+        },
+    }
 
 
-async def comparison_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
-    if "COMPARISON" not in state["routing_decision"].get("agents", []):
-        return state
-
+async def comparison_node(state: LegalResearchState, config=None) -> dict:
+    """Comparison specialist — returns only comparison_result to avoid concurrent write conflicts."""
+    db = _get_db_from_config(config)
     chunks = await _retrieve_chunks(state["query"], state.get("filters", {}), db)
-
-    for chunk in chunks:
-        state["retrieved_chunks"].append(chunk.to_dict())
-
     prompt = load_prompt("comparison")
     agent_output = await _call_agent(
         "comparison",
@@ -268,23 +249,32 @@ async def comparison_node(state: LegalResearchState, db: AsyncSession) -> LegalR
         settings.ollama_primary_model,
         db,
     )
-
-    state["comparison_result"] = agent_output["result"]
-    state["agent_trace"].append({
-        "agent": "comparison",
-        "action": "comparative_analysis",
-        "chunks_found": len(chunks),
-        "top_score": agent_output["result"].get("top_score", 0),
-        "latency_ms": agent_output["latency_ms"],
-        "model_used": agent_output["model_used"],
-    })
-
-    return state
+    return {
+        "comparison_result": agent_output["result"],
+        "comparison_trace": {
+            "action": "comparative_analysis",
+            "chunks_found": len(chunks),
+            "top_score": agent_output["result"].get("top_score", 0),
+            "latency_ms": agent_output["latency_ms"],
+            "model_used": agent_output["model_used"],
+        },
+    }
 
 
-async def synthesis_node(state: LegalResearchState, db: AsyncSession) -> LegalResearchState:
+async def synthesis_node(state: LegalResearchState, config=None) -> LegalResearchState:
+    db = _get_db_from_config(config)
     start_time = time.time()
     ollama = get_ollama_client()
+
+    # Build agent_trace from specialist trace fields
+    for agent_name, trace_field in [
+        ("statute", "statute_trace"),
+        ("constitutional", "constitutional_trace"),
+        ("case_law", "case_law_trace"),
+        ("comparison", "comparison_trace"),
+    ]:
+        if state.get(trace_field):
+            state["agent_trace"].append({**({"agent": agent_name}), **state[trace_field]})
 
     all_results = []
     if state.get("statute_result"):
@@ -341,22 +331,49 @@ def should_run_agent(agent_name: str):
     return check
 
 
+def route_from_router(state: LegalResearchState) -> list[Send]:
+    """
+    Fan out to all relevant specialist nodes in parallel via Send.
+    Each specialist receives a partial state and returns only its result field,
+    avoiding concurrent write conflicts when multiple specialists run.
+    """
+    agents = state["routing_decision"].get("agents", [])
+    specialist_state = {
+        "query": state["query"],
+        "user_id": state["user_id"],
+        "filters": state.get("filters", {}),
+        "routing_decision": state["routing_decision"],
+    }
+
+    sends = []
+    if "STATUTE" in agents:
+        sends.append(Send("statute", specialist_state))
+    if "CONSTITUTIONAL" in agents:
+        sends.append(Send("constitutional", specialist_state))
+    if "CASE_LAW" in agents:
+        sends.append(Send("case_law", specialist_state))
+    if "COMPARISON" in agents:
+        sends.append(Send("comparison", specialist_state))
+
+    return sends
+
+
 def create_legal_research_graph():
     workflow = StateGraph(LegalResearchState)
 
-    workflow.add_node("router", lambda state, db=None: router_node(state, db))
-    workflow.add_node("statute", lambda state, db=None: statute_node(state, db))
-    workflow.add_node("constitutional", lambda state, db=None: constitutional_node(state, db))
-    workflow.add_node("case_law", lambda state, db=None: case_law_node(state, db))
-    workflow.add_node("comparison", lambda state, db=None: comparison_node(state, db))
-    workflow.add_node("synthesis", lambda state, db=None: synthesis_node(state, db))
+    workflow.add_node("router", router_node)
+    workflow.add_node("statute", statute_node)
+    workflow.add_node("constitutional", constitutional_node)
+    workflow.add_node("case_law", case_law_node)
+    workflow.add_node("comparison", comparison_node)
+    workflow.add_node("synthesis", synthesis_node)
 
     workflow.set_entry_point("router")
 
     workflow.add_conditional_edges(
         "router",
-        should_run_agent("STATUTE"),
-        {"statute": "statute", "__end__": "synthesis"}
+        route_from_router,
+        ["statute", "constitutional", "case_law", "comparison"],
     )
 
     workflow.add_edge("statute", "synthesis")
