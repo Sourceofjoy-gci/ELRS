@@ -436,6 +436,7 @@ async def run_legal_research_graph(
         constitutional_result=None,
         case_law_result=None,
         comparison_result=None,
+        subsidiary_result=None,
         retrieved_chunks=[],
         agent_trace=[],
         final_answer="",
