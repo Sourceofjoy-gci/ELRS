@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStreamingChat } from '@/lib/hooks/useStreamingChat'
 import { MessageBubble } from './MessageBubble'
 import { SourceCitation } from './SourceCitation'
+import { CitationPanel } from '@/components/ui/citation-panel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -36,6 +37,9 @@ interface ChatInterfaceProps {
 export function ChatInterface({ initialQuery, filters, className }: ChatInterfaceProps) {
   const [query, setQuery] = useState(initialQuery || '')
   const [messages, setMessages] = useState<Message[]>([])
+  const [citationPanelOpen, setCitationPanelOpen] = useState(false)
+  const [activeCitationId, setActiveCitationId] = useState<string | null>(null)
+  const [highlightEnabled, setHighlightEnabled] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const {
@@ -104,6 +108,41 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
     }
   }
 
+  function renderAnswerWithCitations(content: string, sources: Message['sources']) {
+    if (!sources || sources.length === 0) return <p>{content}</p>
+
+    // Split content on citation markers like [1], [2], etc.
+    const parts = content.split(/(\[\d+\])/g)
+
+    return (
+      <p>
+        {parts.map((part, idx) => {
+          const match = part.match(/^\[(\d+)\]$/)
+          if (match) {
+            const citationIdx = parseInt(match[1], 10) - 1
+            const citation = sources[citationIdx]
+            if (citation) {
+              return (
+                <sup
+                  key={idx}
+                  className="text-primary cursor-pointer hover:bg-primary/10 px-0.5 rounded mx-0.5"
+                  onClick={() => {
+                    setActiveCitationId(citation.id)
+                    setCitationPanelOpen(true)
+                  }}
+                  title={`View ${citation.act_name} citation`}
+                >
+                  [{match[1]}]
+                </sup>
+              )
+            }
+          }
+          return <span key={idx}>{part}</span>
+        })}
+      </p>
+    )
+  }
+
   return (
     <div className={cn('flex flex-col h-full', className)}>
       <div className="flex-1 overflow-y-auto space-y-4 mb-4 scrollbar-thin">
@@ -124,12 +163,14 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
 
         {messages.map((message) => (
           <div key={message.id}>
-            <MessageBubble
-              role={message.role}
-              content={message.content}
-              modelUsed={message.model_used}
-              confidence={message.confidence}
-            />
+            {message.role === 'assistant' && message.sources && message.sources.length > 0
+              ? renderAnswerWithCitations(message.content, message.sources)
+              : <MessageBubble
+                  role={message.role}
+                  content={message.content}
+                  modelUsed={message.model_used}
+                  confidence={message.confidence}
+                />}
             {message.sources && message.sources.length > 0 && (
               <div className="mt-4">
                 <Accordion type="single" collapsible className="w-full">
@@ -194,6 +235,19 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
           Press ⌘/Ctrl + Enter to submit
         </p>
       </div>
+      <CitationPanel
+        citations={(sources || []) as Array<{
+          id: string
+          act_name: string
+          section_number?: string
+          chunk_excerpt: string
+          reranker_score: number
+        }>}
+        activeCitationId={activeCitationId}
+        onClose={() => setCitationPanelOpen(false)}
+        onHighlightToggle={setHighlightEnabled}
+        highlightEnabled={highlightEnabled}
+      />
     </div>
   )
 }
