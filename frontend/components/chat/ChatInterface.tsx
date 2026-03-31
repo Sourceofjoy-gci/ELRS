@@ -33,9 +33,11 @@ interface ChatInterfaceProps {
   initialQuery?: string
   filters?: Record<string, unknown>
   className?: string
+  onStageChange?: (stage: string | null) => void
+  onStageComplete?: (stage: string) => void
 }
 
-export function ChatInterface({ initialQuery, filters, className }: ChatInterfaceProps) {
+export function ChatInterface({ initialQuery, filters, className, onStageChange, onStageComplete }: ChatInterfaceProps) {
   const [query, setQuery] = useState(initialQuery || '')
   const [messages, setMessages] = useState<Message[]>([])
   const [citationPanelOpen, setCitationPanelOpen] = useState(false)
@@ -133,6 +135,27 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
       }
     }
   }, [isStreaming, tokens, messages.length])
+
+  useEffect(() => {
+    // Map agent trace events to progress stages
+    if (agentTrace && agentTrace.length > 0) {
+      const last = agentTrace[agentTrace.length - 1]
+      const stageMap: Record<string, string> = {
+        router: 'routing',
+        statute: 'retrieving',
+        constitutional: 'retrieving',
+        case_law: 'retrieving',
+        comparison: 'retrieving',
+        subsidiary: 'retrieving',
+        synthesis: 'synthesizing',
+      }
+      const stage = stageMap[last.agent]
+      if (stage) {
+        if (last.status === 'completed' && onStageComplete) onStageComplete(stage)
+        if (last.status === 'active' && onStageChange) onStageChange(stage)
+      }
+    }
+  }, [agentTrace, onStageChange, onStageComplete])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {

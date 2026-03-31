@@ -42,6 +42,8 @@ const config: Config = {
           'gold-light': '#FDF5DC',
           crimson: '#7C1A1A',
           'crimson-light': '#FAEAEA',
+          purple: '#7C3AED',
+          'purple-light': '#EDE9FE',
         },
         popover: {
           DEFAULT: 'hsl(var(--popover))',

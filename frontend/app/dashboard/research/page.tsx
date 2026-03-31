@@ -1,89 +1,139 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatInterface } from '@/components/chat/ChatInterface'
-import { FilterPanel } from '@/components/search/FilterPanel'
+import { FilterChip } from '@/components/ui/filter-chip'
+import { DomainPreset } from '@/components/ui/domain-preset'
+import { FilterPanelPopover } from '@/components/search/FilterPanelPopover'
 import { AgentThinkingPanel } from '@/components/chat/AgentThinkingPanel'
+import { Drawer } from '@/components/ui/drawer'
+import { UnifiedProgressBar } from '@/components/ui/progress-bar'
+import { Brain } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { MessageSquare, X, Filter } from 'lucide-react'
+
+interface ActiveFilter {
+  label: string
+  onRemove: () => void
+}
 
 function ResearchContent() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('query') || ''
 
-  const [panelOpen, setPanelOpen] = useState(true)
-  const [filterOpen, setFilterOpen] = useState(false)
   const [filters, setFilters] = useState<Record<string, unknown>>({})
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [currentStage, setCurrentStage] = useState<string | null>(null)
+  const [completedStages, setCompletedStages] = useState<string[]>([])
+
+  // Parse filters from initial query
+  const docTypes: string[] = []
+  if (initialQuery.toLowerCase().includes('constitutional') || initialQuery.toLowerCase().includes('constitution')) {
+    docTypes.push('constitution')
+  }
+  if (initialQuery.toLowerCase().includes('si ') || initialQuery.toLowerCase().includes('statutory instrument')) {
+    docTypes.push('statutory_instrument')
+  }
+  if (initialQuery.toLowerCase().includes('case') || initialQuery.toLowerCase().includes('precedent')) {
+    docTypes.push('case_law')
+  }
+  if (initialQuery.toLowerCase().includes('act') && !docTypes.includes('constitution')) {
+    docTypes.push('act')
+  }
+
+  const activeFilters: ActiveFilter[] = []
+  if (docTypes.length > 0) {
+    activeFilters.push({
+      label: docTypes.join(', '),
+      onRemove: () => setFilters((f) => ({ ...f, doc_type: undefined })),
+    })
+  }
+
+  const domain = docTypes.includes('constitution')
+    ? 'constitutional'
+    : docTypes.includes('statutory_instrument')
+    ? 'immigration'
+    : 'all'
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <Header
-        title="Research"
-        breadcrumb={['Dashboard', 'Research']}
-      />
+      <Header title="Research" breadcrumb={['Dashboard', 'Research']} />
 
-      <div className="flex flex-1 gap-6 mt-6 overflow-hidden">
-        <FilterPanel
-          className={cn(
-            'w-72 flex-shrink-0 transition-all duration-300',
-            filterOpen ? 'block' : 'hidden lg:block'
-          )}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
-
-        <div className="flex-1 min-w-0">
-          <ChatInterface
-            initialQuery={initialQuery}
-            filters={filters}
+      {/* Filter chips + domain bar */}
+      <div className="mt-6 px-6 space-y-3">
+        <div className="flex items-center gap-3">
+          <DomainPreset
+            value={domain}
+            onChange={(val) => {
+              const docTypeMap: Record<string, string | string[] | undefined> = {
+                constitutional: 'constitution',
+                employment: 'act',
+                immigration: 'statutory_instrument',
+                commercial: 'act',
+                all: undefined,
+              }
+              const mapped = docTypeMap[val]
+              setFilters((f) => ({
+                ...f,
+                doc_type: mapped ? [mapped] : undefined,
+              }))
+            }}
           />
         </div>
 
-        <AgentThinkingPanel
-          className={cn(
-            'w-80 flex-shrink-0 transition-all duration-300',
-            panelOpen ? 'block' : 'hidden xl:block'
+        {/* Active filter chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilters.map((chip, idx) => (
+            <FilterChip key={idx} label={chip.label} onRemove={chip.onRemove} />
+          ))}
+          {activeFilters.length === 0 && (
+            <FilterPanelPopover filters={filters} onFiltersChange={setFilters} />
           )}
+          {activeFilters.length > 0 && (
+            <FilterPanelPopover filters={filters} onFiltersChange={setFilters} />
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="px-6 mt-4">
+        <UnifiedProgressBar
+          stages={['routing', 'retrieving', 'analyzing', 'synthesizing']}
+          currentStage={currentStage}
+          completedStages={completedStages}
+          failedStages={[]}
         />
       </div>
 
-      <button
-        onClick={() => setFilterOpen(!filterOpen)}
-        className="fixed bottom-6 left-6 lg:hidden p-3 bg-primary text-white rounded-full shadow-lg"
-      >
-        <Filter className="w-5 h-5" />
-      </button>
-
-      <button
-        onClick={() => setPanelOpen(!panelOpen)}
-        className="fixed bottom-6 right-6 xl:hidden p-3 bg-primary text-white rounded-full shadow-lg"
-      >
-        {panelOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-      </button>
-    </div>
-  )
-}
-
-function LoadingFallback() {
-  return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <Header
-        title="Research"
-        breadcrumb={['Dashboard', 'Research']}
-      />
-      <div className="flex flex-1 gap-6 mt-6 overflow-hidden items-center justify-center">
-        <div className="animate-pulse text-gray-500">Loading research interface...</div>
+      {/* Chat area */}
+      <div className="flex-1 mt-4 px-6 pb-6 overflow-hidden">
+        <ChatInterface
+          initialQuery={initialQuery}
+          filters={filters}
+        />
       </div>
+
+      {/* Floating agent icon */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+        >
+          <Brain className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Agent drawer */}
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <div className="pt-12">
+          <AgentThinkingPanel variant="panel" />
+        </div>
+      </Drawer>
     </div>
   )
 }
 
 export default function ResearchPage() {
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <ResearchContent />
-    </Suspense>
-  )
+  return <ResearchContent />
 }

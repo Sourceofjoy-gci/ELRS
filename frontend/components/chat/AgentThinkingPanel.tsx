@@ -7,6 +7,8 @@ import { CheckCircle, Loader2, Circle, Brain, ArrowRight } from 'lucide-react'
 
 interface AgentThinkingPanelProps {
   trace?: AgentTraceEvent[]
+  variant?: 'panel' | 'icon'
+  onIconClick?: () => void
   className?: string
 }
 
@@ -19,7 +21,22 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   synthesis: 'Synthesis Agent',
 }
 
-export function AgentThinkingPanel({ trace = [], className }: AgentThinkingPanelProps) {
+export function AgentThinkingPanel({ trace = [], variant = 'panel', onIconClick, className }: AgentThinkingPanelProps) {
+  // Icon variant - floating button
+  if (variant === 'icon') {
+    return (
+      <div className={cn('fixed bottom-6 right-6 z-40', className)}>
+        <button
+          onClick={onIconClick}
+          className="p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+        >
+          <Brain className="w-5 h-5" />
+        </button>
+      </div>
+    )
+  }
+
+  // Panel variant - full card content
   const statusIcon = (status: AgentTraceEvent['status']) => {
     switch (status) {
       case 'completed':
