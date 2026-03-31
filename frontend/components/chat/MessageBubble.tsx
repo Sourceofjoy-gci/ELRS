@@ -14,6 +14,7 @@ interface MessageBubbleProps {
   content: string
   modelUsed?: string
   confidence?: 'HIGH' | 'MEDIUM' | 'LOW'
+  isStreaming?: boolean
   className?: string
 }
 
@@ -28,6 +29,7 @@ export function MessageBubble({
   content,
   modelUsed,
   confidence,
+  isStreaming,
   className,
 }: MessageBubbleProps) {
   return (
@@ -66,6 +68,10 @@ export function MessageBubble({
         <div className="prose prose-sm dark:prose-invert max-w-none">
           <p className="whitespace-pre-wrap">{content}</p>
         </div>
+
+        {role === 'assistant' && isStreaming && (
+          <span className="streaming-cursor" aria-hidden="true" />
+        )}
 
         {role === 'assistant' && confidence && (
           <div className="mt-3 flex items-center gap-2">

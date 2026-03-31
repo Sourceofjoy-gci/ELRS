@@ -41,6 +41,8 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
   const [citationPanelOpen, setCitationPanelOpen] = useState(false)
   const [activeCitationId, setActiveCitationId] = useState<string | null>(null)
   const [highlightEnabled, setHighlightEnabled] = useState(false)
+  const [streamEnded, setStreamEnded] = useState(false)
+  const [showConfidence, setShowConfidence] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const {
@@ -65,6 +67,9 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
   const handleSubmit = async (q?: string) => {
     const submittedQuery = q || query
     if (!submittedQuery.trim() || isStreaming) return
+
+    setShowConfidence(false)
+    setStreamEnded(false)
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -101,6 +106,16 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
       }
     }
   }, [tokens, isStreaming, sources])
+
+  useEffect(() => {
+    if (!isStreaming && tokens && messages.length > 0) {
+      setStreamEnded(true)
+      // 300ms delay before showing confidence
+      setTimeout(() => {
+        setShowConfidence(true)
+      }, 300)
+    }
+  }, [isStreaming])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -170,7 +185,8 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
                   role={message.role}
                   content={message.content}
                   modelUsed={message.model_used}
-                  confidence={message.confidence}
+                  confidence={showConfidence ? message.confidence : undefined}
+                  isStreaming={isStreaming && message.role === 'assistant'}
                 />}
             {message.sources && message.sources.length > 0 && (
               <div className="mt-4">
