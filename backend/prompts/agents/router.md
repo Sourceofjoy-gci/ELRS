@@ -4,12 +4,12 @@ Analyse the user's query and output a JSON routing decision.
 
 ## Available Specialist Agents
 
-- STATUTE       → Acts of Parliament, their sections, provisions, amendments,
-                   interpretation (e.g. "What does s 35 Employment Act say?")
-- CONSTITUTIONAL → Rights, freedoms, constitutional supremacy, 2005 Constitution chapters
-- CASE_LAW      → Court judgments, precedents, High Court and Supreme Court of Appeal
-- COMPARISON    → Compare two or more laws, contradictions, legislative history, gaps
-- GENERAL       → Definitions, explanations, introductory questions
+- STATUTE        → Acts of Parliament, their sections, provisions, amendments
+- SUBSIDIARY     → SIs, Statutory Instruments, regulations, rules, orders
+- CONSTITUTIONAL → Rights, freedoms, constitutional supremacy, 2005 Constitution
+- CASE_LAW       → Court judgments, precedents, High Court and Supreme Court
+- COMPARISON     → Compare two or more laws, contradictions, legislative history
+- GENERAL        → Definitions, explanations, questions
 
 ## Output Format (JSON only — no preamble)
 

@@ -328,3 +328,79 @@ async def test_routes_to_multiple_agents(mock_ollama_response, mock_db):
     assert result["constitutional_result"] is not None
     assert result["case_law_result"] is None
     assert result["comparison_result"] is None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_subsidiary_only(mock_ollama_response, mock_db):
+    """Router returns SUBSIDIARY → subsidiary_node runs, others skip."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["SUBSIDIARY"], "reasoning": "subsidiary legislation query", "confidence": 0.9, "query_type": "subsidiary"}')
+
+    initial_state: LegalResearchState = {
+        "query": "What do the SI 45 of 2000 regulations say about immigration?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["SUBSIDIARY"]
+    assert result["statute_result"] is None
+    assert result["constitutional_result"] is None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is None
+    assert result.get("subsidiary_result") is not None
+
+
+@pytest.mark.asyncio
+async def test_routes_to_subsidiary_with_statute(mock_ollama_response, mock_db):
+    """Router returns [STATUTE, SUBSIDIARY] → both specialist nodes run."""
+    graph = create_legal_research_graph()
+
+    async def mock_chat(messages, model):
+        return mock_ollama_response('{"agents": ["STATUTE", "SUBSIDIARY"], "reasoning": "query about statute and SI", "confidence": 0.85, "query_type": "mixed"}')
+
+    initial_state: LegalResearchState = {
+        "query": "How do the Employment Act provisions interact with SI 45 of 2000?",
+        "user_id": "test-user-id",
+        "filters": {},
+        "routing_decision": {},
+        "statute_result": None,
+        "constitutional_result": None,
+        "case_law_result": None,
+        "comparison_result": None,
+        "retrieved_chunks": [],
+        "agent_trace": [],
+        "final_answer": "",
+        "sources": [],
+        "confidence": "MEDIUM",
+        "disclaimer": "",
+    }
+
+    with patch("app.agents.graph.get_ollama_client") as mock_client:
+        mock_client.return_value.chat = mock_chat
+        with patch("app.agents.graph._retrieve_chunks", return_value=[]):
+            result = await graph.ainvoke(initial_state, {"configurable": {"db": mock_db}})
+
+    assert result["routing_decision"]["agents"] == ["STATUTE", "SUBSIDIARY"]
+    assert result["statute_result"] is not None
+    assert result.get("subsidiary_result") is not None
+    assert result["constitutional_result"] is None
+    assert result["case_law_result"] is None
+    assert result["comparison_result"] is None
