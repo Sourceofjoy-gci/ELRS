@@ -41,9 +41,9 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
   const [citationPanelOpen, setCitationPanelOpen] = useState(false)
   const [activeCitationId, setActiveCitationId] = useState<string | null>(null)
   const [highlightEnabled, setHighlightEnabled] = useState(false)
-  const [streamEnded, setStreamEnded] = useState(false)
   const [showConfidence, setShowConfidence] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const confidenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   const {
     tokens,
@@ -59,8 +59,15 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
   }, [tokens, messages])
 
   useEffect(() => {
-    if (initialQuery && initialQuery.trim()) {
-      handleSubmit(initialQuery)
+    if (initialQuery && initialQuery.trim() && messages.length === 0 && !isStreaming) {
+      const q = initialQuery
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: q,
+      }
+      setMessages((prev) => [...prev, userMessage])
+      submitQuery(q, filters)
     }
   }, [initialQuery])
 
@@ -69,7 +76,9 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
     if (!submittedQuery.trim() || isStreaming) return
 
     setShowConfidence(false)
-    setStreamEnded(false)
+    if (confidenceTimeoutRef.current) {
+      clearTimeout(confidenceTimeoutRef.current)
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -109,13 +118,21 @@ export function ChatInterface({ initialQuery, filters, className }: ChatInterfac
 
   useEffect(() => {
     if (!isStreaming && tokens && messages.length > 0) {
-      setStreamEnded(true)
+      // Clear any existing timeout
+      if (confidenceTimeoutRef.current) {
+        clearTimeout(confidenceTimeoutRef.current)
+      }
       // 300ms delay before showing confidence
-      setTimeout(() => {
+      confidenceTimeoutRef.current = setTimeout(() => {
         setShowConfidence(true)
       }, 300)
     }
-  }, [isStreaming])
+    return () => {
+      if (confidenceTimeoutRef.current) {
+        clearTimeout(confidenceTimeoutRef.current)
+      }
+    }
+  }, [isStreaming, tokens, messages.length])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
