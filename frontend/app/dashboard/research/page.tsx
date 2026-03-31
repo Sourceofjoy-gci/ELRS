@@ -9,7 +9,6 @@ import { FilterPanelPopover } from '@/components/search/FilterPanelPopover'
 import { AgentThinkingPanel } from '@/components/chat/AgentThinkingPanel'
 import { Drawer } from '@/components/ui/drawer'
 import { UnifiedProgressBar } from '@/components/ui/progress-bar'
-import { Brain } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
@@ -87,12 +86,7 @@ function ResearchContent() {
           {activeFilters.map((chip, idx) => (
             <FilterChip key={idx} label={chip.label} onRemove={chip.onRemove} />
           ))}
-          {activeFilters.length === 0 && (
-            <FilterPanelPopover filters={filters} onFiltersChange={setFilters} />
-          )}
-          {activeFilters.length > 0 && (
-            <FilterPanelPopover filters={filters} onFiltersChange={setFilters} />
-          )}
+          <FilterPanelPopover filters={filters} onFiltersChange={setFilters} />
         </div>
       </div>
 
@@ -107,22 +101,15 @@ function ResearchContent() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 mt-4 px-6 pb-6 overflow-hidden">
+      <div className="flex-1 mt-4 px-6 pb-6 overflow-y-auto">
         <ChatInterface
           initialQuery={initialQuery}
           filters={filters}
         />
       </div>
 
-      {/* Floating agent icon */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-        >
-          <Brain className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Floating agent icon — uses AgentThinkingPanel in icon mode */}
+      <AgentThinkingPanel variant="icon" onIconClick={() => setDrawerOpen(true)} className="fixed bottom-6 right-6" />
 
       {/* Agent drawer */}
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
