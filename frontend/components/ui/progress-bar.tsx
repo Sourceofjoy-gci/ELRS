@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
 
-type Stage = 'routing' | 'retrieving' | 'analyzing' | 'synthesizing'
+export type Stage = 'routing' | 'retrieving' | 'analyzing' | 'synthesizing'
 
 interface UnifiedProgressBarProps {
   stages: Stage[]

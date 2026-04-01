@@ -8,7 +8,7 @@ import { DomainPreset } from '@/components/ui/domain-preset'
 import { FilterPanelPopover } from '@/components/search/FilterPanelPopover'
 import { AgentThinkingPanel } from '@/components/chat/AgentThinkingPanel'
 import { Drawer } from '@/components/ui/drawer'
-import { UnifiedProgressBar } from '@/components/ui/progress-bar'
+import { UnifiedProgressBar, Stage } from '@/components/ui/progress-bar'
 import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
@@ -23,8 +23,8 @@ function ResearchContent() {
 
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [currentStage, setCurrentStage] = useState<string | null>(null)
-  const [completedStages, setCompletedStages] = useState<string[]>([])
+  const [currentStage, setCurrentStage] = useState<Stage | null>(null)
+  const [completedStages, setCompletedStages] = useState<Stage[]>([])
 
   // Parse filters from initial query
   const docTypes: string[] = []
