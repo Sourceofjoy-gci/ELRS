@@ -1,7 +1,7 @@
 'use client'
 
+import React, { useEffect, useState, useRef, createContext, useContext } from 'react'
 import { cn } from '@/lib/utils'
-import { useEffect, useState, useRef, createContext, useContext } from 'react'
 
 interface PopoverContextValue {
   open: boolean
@@ -67,14 +67,14 @@ export function PopoverTrigger({ children, asChild, className }: PopoverTriggerP
   }
 
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<{ onClick?: () => void; className?: string }>, {
+    const child = children as React.ReactElement
+    const existingOnClick = (child.props as { onClick?: () => void }).onClick
+    return React.cloneElement(child, {
       onClick: (e: React.MouseEvent) => {
         handleClick(e)
-        if ((children as React.ReactElement<{ onClick?: () => void }>).props.onClick) {
-          (children as React.ReactElement<{ onClick?: () => void }>).props.onClick()
-        }
+        if (existingOnClick) existingOnClick()
       },
-      className: cn((children as React.ReactElement<{ className?: string }>).props.className, className),
+      className: cn((child.props as { className?: string }).className, className),
     })
   }
 

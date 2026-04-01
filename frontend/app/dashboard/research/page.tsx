@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { FilterChip } from '@/components/ui/filter-chip'
@@ -122,5 +122,9 @@ function ResearchContent() {
 }
 
 export default function ResearchPage() {
-  return <ResearchContent />
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-7rem)]"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>}>
+      <ResearchContent />
+    </Suspense>
+  )
 }
